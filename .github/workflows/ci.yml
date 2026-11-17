@@ -1,0 +1,57 @@
+name: Cortex Hybrid RAG CI & Eval Quality Gate
+
+on:
+  push:
+    branches: ["dev", "main", "feat/**", "fix/**", "sdd/**"]
+  pull_request:
+    branches: ["dev", "main"]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-eval:
+    name: Python 3.12 Unit, Integration & RAG Eval Harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax & Bytecode Compilation Check
+        run: python -m compileall -q src tests
+
+      - name: Domain Purity Verification (Zero External Imports in src/domain)
+        run: |
+          python -c "
+          import ast, pathlib, sys
+          allowed = {'__future__', 'collections', 'collections.abc', 'dataclasses', 'enum', 'hashlib', 'math', 're', 'time', 'typing'}
+          for path in pathlib.Path('src/domain').glob('*.py'):
+              tree = ast.parse(path.read_text(encoding='utf-8'))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          if alias.name not in allowed and not alias.name.startswith('src.domain'):
+                              sys.exit(f'Disallowed import {alias.name} in {path}')
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      if node.module not in allowed and not node.module.startswith('src.domain'):
+                          sys.exit(f'Disallowed from-import {node.module} in {path}')
+          print('Domain purity verified.')
+          "
+
+      - name: Run Unit, Persistence & Integration Test Suite
+        run: python -m unittest discover -s tests -v
+
+      - name: Run Golden Dataset RAG Evaluation Gate
+        run: |
+          python -c "
+          from src.application.services import CortexApplicationService
+          svc = CortexApplicationService(db_path=':memory:', auto_seed=True)
+          report = svc.run_eval_suite(enforce_gate=True)
+          assert report['passed_gate'] is True, f'Quality gate failed: {report}'
+          print('Eval Suite Passed:', report['run_id'], 'avg_faithfulness=', report['avg_faithfulness'])
+          "
