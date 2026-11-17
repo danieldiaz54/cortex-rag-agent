@@ -1,0 +1,34 @@
+services:
+  cortex-pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: cortex-pgvector
+    ports:
+      - "5439:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cortex_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cortex_dev_local}
+      POSTGRES_DB: ${POSTGRES_DB:-cortex_rag_dev}
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cortex_dev} -d ${POSTGRES_DB:-cortex_rag_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cortex-rag-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cortex-rag-agent
+    ports:
+      - "8090:8090"
+    environment:
+      CORTEX_ENV: development
+      CORTEX_HOST: 0.0.0.0
+      CORTEX_PORT: 8090
+      CORTEX_SQLITE_PATH: /app/.data/cortex_dev.sqlite3
+      DATABASE_URL: postgresql://cortex_dev:cortex_dev_local@cortex-pgvector:5432/cortex_rag_dev
+    depends_on:
+      cortex-pgvector:
+        condition: service_healthy

@@ -1,15 +1,38 @@
 services:
+  cortex-pgvector-dev:
+    image: pgvector/pgvector:pg16
+    container_name: cortex-pgvector-dev
+    ports:
+      - "5439:5432"
+    environment:
+      POSTGRES_USER: cortex_dev
+      POSTGRES_PASSWORD: cortex_dev_local
+      POSTGRES_DB: cortex_rag_dev
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cortex_dev -d cortex_rag_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   cortex-rag-agent-dev:
-    image: node:22-alpine
+    image: python:3.12-slim
     container_name: cortex-rag-agent-dev
     working_dir: /app
     volumes:
       - .:/app
     ports:
-      - "3001:3000"
+      - "8090:8090"
     env_file:
       - path: .env.development
         required: false
     environment:
-      - NODE_ENV=development
-    command: sh -c "npm install && npm run dev"
+      - CORTEX_ENV=development
+      - CORTEX_PORT=8090
+      - CORTEX_SQLITE_PATH=/app/.data/cortex_dev.sqlite3
+      - DATABASE_URL=postgresql://cortex_dev:cortex_dev_local@cortex-pgvector-dev:5432/cortex_rag_dev
+    depends_on:
+      cortex-pgvector-dev:
+        condition: service_healthy
+    command: python -m src.main
