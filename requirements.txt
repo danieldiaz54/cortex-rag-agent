@@ -1,0 +1,2 @@
+# Core runtime uses 100% Python 3.12 standard library (zero external dependencies required).
+# Optional ASGI container dependencies can be installed via `pip install .[asgi]`.
