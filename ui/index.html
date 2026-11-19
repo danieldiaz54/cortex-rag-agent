@@ -1,2447 +1,614 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cortex RAG Agent — Multi-Agent Hybrid Retrieval &amp; Eval Console</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg-canvas: #F7F6F3;
-      --bg-surface: #FFFFFF;
-      --bg-subtle: #FBFBFA;
-      --bg-muted: #F1F0EC;
-      --text-primary: #111111;
-      --text-secondary: #2F3437;
-      --text-muted: #787774;
-      --border-hairline: #EAEAEA;
-      --border-strong: #D6D5D0;
-
-      /* Spot Pastels per minimalist-skill */
-      --pastel-green-bg: #EDF3EC;
-      --pastel-green-fg: #346538;
-      --pastel-blue-bg: #E1F3FE;
-      --pastel-blue-fg: #1F6C9F;
-      --pastel-yellow-bg: #FBF3DB;
-      --pastel-yellow-fg: #956400;
-      --pastel-red-bg: #FDEBEC;
-      --pastel-red-fg: #9F2F2D;
-
-      --font-sans: 'Switzer', 'Geist Sans', 'Plus Jakarta Sans', 'SF Pro Display', 'Helvetica Neue', sans-serif;
-      --font-serif: 'Instrument Serif', 'Newsreader', 'Lyon Text', 'Playfair Display', Georgia, serif;
-      --font-mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-
-      --radius-card: 8px;
-      --radius-btn: 5px;
-      --radius-pill: 9999px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html {
-      font-size: 16px;
-      scroll-behavior: smooth;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    body {
-      background-color: var(--bg-canvas);
-      color: var(--text-primary);
-      font-family: var(--font-sans);
-      line-height: 1.6;
-      min-height: 100vh;
-      position: relative;
-      overflow-x: hidden;
-    }
-
-    /* Ambient non-intrusive background texture & warm radial light */
-    .ambient-layer {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      background-image:
-        radial-gradient(circle at 18% 12%, rgba(31, 108, 159, 0.03), transparent 45%),
-        radial-gradient(circle at 82% 78%, rgba(149, 100, 0, 0.025), transparent 50%),
-        linear-gradient(to right, rgba(0, 0, 0, 0.018) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(0, 0, 0, 0.018) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 64px 64px, 64px 64px;
-    }
-
-    .font-mono {
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .font-serif {
-      font-family: var(--font-serif);
-      letter-spacing: -0.025em;
-      line-height: 1.1;
-      font-weight: 400;
-    }
-
-    /* Top Editorial Header Bar */
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      background: rgba(247, 246, 243, 0.92);
-      backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    .topbar-inner {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 14px 28px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-    }
-
-    .brand-cluster {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .window-dots {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding-right: 8px;
-      border-right: 1px solid var(--border-hairline);
-    }
-
-    .window-dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: #D8D7D2;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-    }
-
-    .brand-title {
-      font-size: 0.92rem;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .brand-sub {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-    }
-
-    .telemetry-cluster {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* Pill Status Badges */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: var(--radius-pill);
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-
-    .badge-green {
-      background-color: var(--pastel-green-bg);
-      color: var(--pastel-green-fg);
-      border-color: rgba(52, 101, 56, 0.16);
-    }
-
-    .badge-blue {
-      background-color: var(--pastel-blue-bg);
-      color: var(--pastel-blue-fg);
-      border-color: rgba(31, 108, 159, 0.16);
-    }
-
-    .badge-yellow {
-      background-color: var(--pastel-yellow-bg);
-      color: var(--pastel-yellow-fg);
-      border-color: rgba(149, 100, 0, 0.18);
-    }
-
-    .badge-red {
-      background-color: var(--pastel-red-bg);
-      color: var(--pastel-red-fg);
-      border-color: rgba(159, 47, 45, 0.18);
-    }
-
-    .badge-neutral {
-      background-color: var(--bg-surface);
-      color: var(--text-secondary);
-      border-color: var(--border-hairline);
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background-color: currentColor;
-    }
-
-    /* Main Container & Macro Whitespace */
-    .workspace {
-      position: relative;
-      z-index: 1;
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 48px 28px 96px;
-      display: flex;
-      flex-direction: column;
-      gap: 56px;
-    }
-
-    /* Hero Editorial Intro */
-    .hero-section {
-      display: grid;
-      grid-template-columns: 1.35fr 0.65fr;
-      gap: 28px;
-      align-items: end;
-      padding-bottom: 28px;
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    .hero-eyebrow {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .hero-heading {
-      font-family: var(--font-serif);
-      font-size: clamp(2.35rem, 4vw, 3.5rem);
-      color: var(--text-primary);
-      letter-spacing: -0.03em;
-      line-height: 1.06;
-      margin-bottom: 16px;
-    }
-
-    .hero-lead {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      max-width: 68ch;
-      line-height: 1.65;
-    }
-
-    .hero-spec-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-hairline);
-      border-radius: var(--radius-card);
-      padding: 22px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .spec-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.8rem;
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    .spec-row:last-child {
-      padding-bottom: 0;
-      border-bottom: none;
-    }
-
-    .spec-label {
-      color: var(--text-muted);
-    }
-
-    .spec-val {
-      font-family: var(--font-mono);
-      font-weight: 500;
-      color: var(--text-primary);
-    }
-
-    /* Bento Grid Layout */
-    .bento-grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 24px;
-    }
-
-    .col-12 { grid-column: span 12; }
-    .col-8 { grid-column: span 8; }
-    .col-7 { grid-column: span 7; }
-    .col-6 { grid-column: span 6; }
-    .col-5 { grid-column: span 5; }
-    .col-4 { grid-column: span 4; }
-
-    @media (max-width: 1024px) {
-      .hero-section {
-        grid-template-columns: 1fr;
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cortex — Chat Inteligente con tus Documentos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg-canvas: #f8fafc;
+        --bg-paper: #ffffff;
+        --bg-soft: #eef2f7;
+        --navy-ink: #1e3a5f;
+        --navy-hover: #172e4d;
+        --body-ink: #1e293b;
+        --muted-ink: #475569;
+        --border-rule: #cbd5e1;
+        --cite-amber: #b45309;
+        --cite-bg: #fef3c7;
+        --font-serif: "Source Serif 4", Georgia, serif;
+        --font-sans: "Atkinson Hyperlegible", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, monospace;
       }
-      .col-8, .col-7, .col-6, .col-5, .col-4 {
-        grid-column: span 12;
+
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg-canvas);
+        color: var(--body-ink);
+        font-family: var(--font-sans);
+        line-height: 1.55;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
       }
-    }
+      ::selection { background: var(--cite-bg); color: var(--navy-ink); }
+      :focus-visible { outline: 2px solid var(--navy-ink); outline-offset: 2px; }
+      button, input, textarea { font-family: inherit; }
 
-    /* Card Surface */
-    .card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-hairline);
-      border-radius: var(--radius-card);
-      padding: 28px 30px;
-      transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms ease;
-    }
-
-    .card:hover {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-
-    .section-header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 20px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    .section-title-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .section-index {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      padding: 2px 7px;
-      border: 1px solid var(--border-hairline);
-      border-radius: 4px;
-      background: var(--bg-subtle);
-    }
-
-    .section-title {
-      font-size: 1.05rem;
-      font-weight: 600;
-      letter-spacing: -0.015em;
-      color: var(--text-primary);
-    }
-
-    .section-subtitle {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-
-    /* Interactive Query Console */
-    .preset-bar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-
-    .preset-label {
-      font-family: var(--font-mono);
-      font-size: 0.73rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-right: 4px;
-    }
-
-    .preset-btn {
-      appearance: none;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-hairline);
-      border-radius: var(--radius-btn);
-      padding: 6px 11px;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease;
-    }
-
-    .preset-btn:hover {
-      background: var(--bg-muted);
-      border-color: var(--border-strong);
-      color: var(--text-primary);
-    }
-
-    .preset-btn:active {
-      transform: scale(0.98);
-    }
-
-    .preset-btn.active {
-      background: var(--text-primary);
-      color: #FFFFFF;
-      border-color: var(--text-primary);
-    }
-
-    .query-form {
-      display: grid;
-      grid-template-columns: 1fr 140px auto;
-      gap: 12px;
-      align-items: start;
-    }
-
-    @media (max-width: 768px) {
-      .query-form {
-        grid-template-columns: 1fr;
+      .cx-header {
+        background: var(--bg-paper);
+        border-bottom: 1px solid var(--border-rule);
+        padding: 12px 24px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
       }
-    }
-
-    .field-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .field-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .field-label span.font-mono {
-      font-weight: 400;
-      color: var(--text-muted);
-      font-size: 0.7rem;
-    }
-
-    .input-text,
-    .input-num {
-      width: 100%;
-      padding: 11px 14px;
-      font-size: 0.92rem;
-      color: var(--text-primary);
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-hairline);
-      border-radius: var(--radius-btn);
-      outline: none;
-      transition: border-color 150ms ease, background-color 150ms ease;
-    }
-
-    .input-text {
-      font-family: var(--font-sans);
-    }
-
-    .input-num {
-      font-family: var(--font-mono);
-    }
-
-    .input-text:focus,
-    .input-num:focus {
-      background: var(--bg-surface);
-      border-color: var(--text-primary);
-    }
-
-    .input-invalid {
-      border-color: var(--pastel-red-fg) !important;
-      background: var(--pastel-red-bg) !important;
-    }
-
-    .btn-primary {
-      appearance: none;
-      background: #111111;
-      color: #FFFFFF;
-      border: 1px solid #111111;
-      border-radius: var(--radius-btn);
-      padding: 11px 20px;
-      font-family: var(--font-sans);
-      font-size: 0.88rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      height: 43px;
-      margin-top: 24px;
-      transition: background-color 150ms ease, transform 120ms ease;
-      white-space: nowrap;
-    }
-
-    .btn-primary:hover {
-      background: #333333;
-      border-color: #333333;
-    }
-
-    .btn-primary:active {
-      transform: scale(0.98);
-    }
-
-    .btn-primary:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      appearance: none;
-      background: var(--bg-surface);
-      color: var(--text-primary);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-btn);
-      padding: 8px 14px;
-      font-family: var(--font-sans);
-      font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: background-color 150ms ease, transform 120ms ease;
-    }
-
-    .btn-secondary:hover {
-      background: var(--bg-muted);
-    }
-
-    .btn-secondary:active {
-      transform: scale(0.98);
-    }
-
-    kbd {
-      border: 1px solid var(--border-hairline);
-      border-radius: 4px;
-      background: var(--bg-canvas);
-      padding: 1px 6px;
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-    }
-
-    .validation-banner {
-      margin-top: 12px;
-      padding: 10px 14px;
-      border-radius: var(--radius-btn);
-      border: 1px solid rgba(159, 47, 45, 0.25);
-      background: var(--pastel-red-bg);
-      color: var(--pastel-red-fg);
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
-      display: none;
-    }
-
-    .validation-banner.visible {
-      display: block;
-    }
-
-    .console-meta-footer {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border-hairline);
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.76rem;
-      color: var(--text-muted);
-    }
-
-    /* Multi-Agent Trace Timeline */
-    .trace-meta-strip {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 18px;
-    }
-
-    .mini-stat {
-      padding: 12px 14px;
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-      background: var(--bg-subtle);
-    }
-
-    .mini-stat-label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-
-    .mini-stat-value {
-      font-family: var(--font-mono);
-      font-size: 0.92rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .trace-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .trace-item {
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-      padding: 14px 16px;
-      background: var(--bg-surface);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .trace-item-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .trace-agent-name {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .trace-step-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      background: var(--bg-muted);
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-    }
-
-    .trace-action {
-      font-family: var(--font-mono);
-      font-size: 0.73rem;
-      color: var(--pastel-blue-fg);
-      background: var(--pastel-blue-bg);
-      padding: 2px 8px;
-      border-radius: var(--radius-pill);
-    }
-
-    .trace-detail {
-      font-family: var(--font-mono);
-      font-size: 0.76rem;
-      color: var(--text-secondary);
-      word-break: break-word;
-    }
-
-    .trace-duration {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    /* Grounded Synthesis & Citations */
-    .synthesis-box {
-      padding: 22px 24px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-      margin-bottom: 22px;
-    }
-
-    .synthesis-meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    .synthesis-answer {
-      font-size: 0.98rem;
-      line-height: 1.72;
-      color: var(--text-primary);
-    }
-
-    .cite-pill {
-      display: inline-flex;
-      align-items: center;
-      margin: 0 3px;
-      padding: 1px 8px;
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      font-size: 0.76rem;
-      font-weight: 600;
-      background: var(--pastel-blue-bg);
-      color: var(--pastel-blue-fg);
-      border: 1px solid rgba(31, 108, 159, 0.22);
-      cursor: pointer;
-      vertical-align: baseline;
-      transition: background-color 150ms ease;
-    }
-
-    .cite-pill:hover {
-      background: #CBE8FC;
-    }
-
-    .citations-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 14px;
-    }
-
-    .citation-card {
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-      padding: 16px 18px;
-      background: var(--bg-surface);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      transition: border-color 200ms ease, background-color 200ms ease;
-    }
-
-    .citation-card.highlighted {
-      border-color: var(--pastel-blue-fg);
-      background: var(--pastel-blue-bg);
-    }
-
-    .citation-card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .citation-title {
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      line-height: 1.35;
-    }
-
-    .citation-excerpt {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      line-height: 1.55;
-    }
-
-    /* Data Tables */
-    .table-wrap {
-      width: 100%;
-      overflow-x: auto;
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      background: var(--bg-surface);
-    }
-
-    th {
-      padding: 11px 14px;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      background: var(--bg-subtle);
-      border-bottom: 1px solid var(--border-hairline);
-      white-space: nowrap;
-    }
-
-    td {
-      padding: 12px 14px;
-      font-size: 0.83rem;
-      color: var(--text-secondary);
-      border-bottom: 1px solid var(--border-hairline);
-      vertical-align: middle;
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    tr:hover td {
-      background: var(--bg-subtle);
-    }
-
-    /* Eval KPI Row */
-    .eval-kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-
-    @media (max-width: 900px) {
-      .eval-kpi-grid {
-        grid-template-columns: repeat(2, 1fr);
+      .cx-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
       }
-    }
+      .cx-brand h1 {
+        font-family: var(--font-serif);
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--navy-ink);
+        margin: 0;
+      }
+      .cx-brand span {
+        font-size: 13.5px;
+        color: var(--muted-ink);
+      }
+      .cx-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .cx-btn-primary {
+        border: 1px solid var(--navy-ink);
+        background: var(--navy-ink);
+        color: #ffffff;
+        border-radius: 8px;
+        padding: 8px 15px;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .cx-btn-primary:hover:not(:disabled) { background: var(--navy-hover); }
+      .cx-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+      .cx-btn-outline {
+        border: 1px solid var(--border-rule);
+        background: var(--bg-paper);
+        color: var(--body-ink);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .cx-btn-outline:hover { background: var(--bg-soft); }
 
-    .kpi-card {
-      padding: 16px 18px;
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-      background: var(--bg-subtle);
-    }
+      /* Split 2-pane Reading & Q&A Studio */
+      .cx-workspace {
+        flex: 1;
+        min-height: 0;
+        max-width: 1360px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 20px 24px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+        gap: 22px;
+      }
+      .cx-pane {
+        background: var(--bg-paper);
+        border: 1px solid var(--border-rule);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .cx-pane-head {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border-rule);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .cx-pane-head h2 {
+        font-family: var(--font-serif);
+        font-size: 18px;
+        color: var(--navy-ink);
+        margin: 0;
+      }
+      .cx-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
 
-    .kpi-label {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
+      .cx-starters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .cx-starter-chip {
+        border: 1px solid var(--border-rule);
+        background: var(--bg-canvas);
+        color: var(--navy-ink);
+        border-radius: 8px;
+        padding: 6px 11px;
+        font-size: 13px;
+        cursor: pointer;
+        text-align: left;
+      }
+      .cx-starter-chip:hover { border-color: var(--navy-ink); background: var(--bg-soft); }
 
-    .kpi-value {
-      font-family: var(--font-mono);
-      font-size: 1.35rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
+      .cx-turn {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .cx-user-q {
+        align-self: flex-end;
+        max-width: 85%;
+        background: var(--navy-ink);
+        color: #ffffff;
+        padding: 10px 14px;
+        border-radius: 12px 12px 2px 12px;
+        font-size: 14.5px;
+      }
+      .cx-ai-a {
+        background: var(--bg-canvas);
+        border: 1px solid var(--border-rule);
+        border-radius: 12px;
+        padding: 16px 18px;
+      }
+      .cx-ai-serif {
+        font-family: var(--font-serif);
+        font-size: 16.5px;
+        line-height: 1.65;
+        margin: 0;
+        color: var(--body-ink);
+      }
+      .cx-cite-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-rule);
+      }
+      .cx-cite-btn {
+        border: 1px solid #f59e0b;
+        background: var(--cite-bg);
+        color: var(--cite-amber);
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .cx-cite-btn:hover { background: #fde68a; }
 
-    .kpi-threshold {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
+      .cx-ask-bar {
+        padding: 14px 18px;
+        border-top: 1px solid var(--border-rule);
+        background: var(--bg-paper);
+        display: flex;
+        gap: 10px;
+      }
+      .cx-ask-input {
+        flex: 1;
+        border: 1px solid var(--border-rule);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14.5px;
+      }
 
-    /* Corpus Drawer Cards */
-    .corpus-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 14px;
-    }
+      /* Right Source Document Reader */
+      .cx-doc-block {
+        border: 1px solid var(--border-rule);
+        border-radius: 10px;
+        padding: 16px 18px;
+        background: var(--bg-paper);
+        transition: background-color 220ms ease, border-color 220ms ease;
+      }
+      .cx-doc-block[data-highlighted="true"] {
+        background: var(--cite-bg);
+        border-color: var(--cite-amber);
+      }
+      .cx-doc-title {
+        font-family: var(--font-serif);
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--navy-ink);
+        margin: 0 0 4px;
+      }
+      .cx-doc-meta {
+        font-size: 12.5px;
+        color: var(--muted-ink);
+        margin-bottom: 8px;
+      }
+      .cx-doc-body {
+        font-family: var(--font-serif);
+        font-size: 15px;
+        line-height: 1.6;
+        margin: 0;
+        color: var(--body-ink);
+      }
 
-    .corpus-card {
-      border: 1px solid var(--border-hairline);
-      border-radius: 6px;
-      padding: 16px 18px;
-      background: var(--bg-subtle);
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      transition: border-color 150ms ease, background-color 150ms ease;
-    }
+      /* Drawers */
+      .cx-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.34);
+        z-index: 40;
+        display: none;
+        justify-content: flex-end;
+      }
+      .cx-backdrop[data-open="true"] { display: flex; }
+      .cx-drawer {
+        width: min(460px, 100vw);
+        height: 100%;
+        background: var(--bg-paper);
+        border-left: 1px solid var(--border-rule);
+        display: flex;
+        flex-direction: column;
+      }
+      .cx-drawer-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-rule);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .cx-drawer-head h2 { font-family: var(--font-serif); font-size: 20px; margin: 0; color: var(--navy-ink); }
+      .cx-drawer-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .cx-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      .cx-tech-card {
+        border: 1px solid var(--border-rule);
+        background: var(--bg-canvas);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 13px;
+      }
 
-    .corpus-card:hover {
-      border-color: var(--text-primary);
-      background: var(--bg-surface);
-    }
-
-    .tag-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-top: auto;
-      padding-top: 6px;
-    }
-
-    .tag-chip {
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: var(--bg-muted);
-      color: var(--text-secondary);
-      border: 1px solid var(--border-hairline);
-    }
-
-    /* Scroll reveal transition per minimalist-skill */
-    .reveal-block {
-      opacity: 0;
-      transform: translateY(12px);
-      transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .reveal-block.is-visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .sub-heading {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-      margin: 22px 0 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-  </style>
-</head>
-<body>
-  <div class="ambient-layer" aria-hidden="true"></div>
-
-  <!-- Minimalist Window & Telemetry Header Bar -->
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="brand-cluster">
-        <div class="window-dots" aria-hidden="true">
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-        </div>
-        <div class="brand-title">
-          <span>CORTEX RAG AGENT</span>
-          <span class="brand-sub">v1.0 · SDD-CORE</span>
-        </div>
+      @media (max-width: 900px) {
+        body { height: auto; }
+        .cx-workspace { grid-template-columns: 1fr; }
+        .cx-pane { min-height: 440px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="cx-header">
+      <div class="cx-brand">
+        <h1>Cortex</h1>
+        <span>Pregunta a tus documentos con citas verificables</span>
       </div>
-
-      <div class="telemetry-cluster">
-        <span id="pipeline-arch-badge" class="badge badge-neutral font-mono">
-          Router -&gt; BM25+Vector RRF -&gt; Synthesizer -&gt; Citation Guardrail
-        </span>
-        <span id="corpus-count-badge" class="badge badge-blue font-mono">
-          8 CHUNKS · 64-D L2
-        </span>
-        <span id="system-mode-badge" class="badge badge-green font-mono">
-          <span class="status-dot"></span>
-          <span id="system-mode-text">PROBING ENGINE...</span>
-        </span>
+      <div class="cx-header-actions">
+        <button type="button" class="cx-btn-outline" id="cx-ingest-btn">+ Agregar documento</button>
+        <button type="button" class="cx-btn-primary" id="cx-arch-btn">Arquitectura</button>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <main class="workspace">
-    <!-- Editorial Hero Header -->
-    <section class="hero-section reveal-block">
-      <div>
-        <div class="hero-eyebrow">
-          <span>BOUNDED CONTEXT · CORTEX-RAG-AGENT</span>
-          <span>·</span>
-          <span>HYBRID RETRIEVAL &amp; GUARDRAIL TELEMETRY</span>
-        </div>
-        <h1 class="hero-heading">Multi-Agent Hybrid Retrieval &amp; Grounded Evaluation Console.</h1>
-        <p class="hero-lead">
-          Deterministic lexical Okapi BM25 (<span class="font-mono">k1=1.5, b=0.75</span>) fused with 64-dimensional L2-normalized vector similarity via weighted Reciprocal Rank Fusion (<span class="font-mono">k=60</span>). Every synthesized statement is verified by <span class="font-mono">CitationGuardrailAgent</span> and recorded in an append-only ledger.
-        </p>
-      </div>
-
-      <aside class="hero-spec-card" aria-label="Engine invariants">
-        <div class="spec-row">
-          <span class="spec-label">Lexical Engine</span>
-          <span class="spec-val">Okapi BM25 (k1=1.5, b=0.75)</span>
-        </div>
-        <div class="spec-row">
-          <span class="spec-label">Vector Space</span>
-          <span class="spec-val">64-D BLAKE2s L2 Cosine</span>
-        </div>
-        <div class="spec-row">
-          <span class="spec-label">Rank Fusion</span>
-          <span class="spec-val">Weighted RRF (k=60)</span>
-        </div>
-        <div class="spec-row">
-          <span class="spec-label">Guardrail Gate</span>
-          <span class="spec-val">Faithfulness &gt;= 0.65</span>
-        </div>
-        <div class="spec-row">
-          <span class="spec-label">Audit Storage</span>
-          <span class="spec-val">Append-Only Trigger Ledger</span>
-        </div>
-      </aside>
-    </section>
-
-    <!-- Bento Row 1: Interactive Query Console (Full Width) -->
-    <div class="bento-grid">
-      <section class="card col-12 reveal-block" aria-labelledby="console-heading">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-index">01</span>
-            <h2 id="console-heading" class="section-title">Interactive Query &amp; Dynamic Routing Console</h2>
-          </div>
-          <span class="section-subtitle font-mono">POST /api/v1/rag/query · Strict Top-K Integer Validation [1..10]</span>
+    <main class="cx-workspace">
+      <section class="cx-pane" aria-label="Conversación sobre documentos">
+        <div class="cx-pane-head">
+          <h2>Preguntas y respuestas</h2>
+          <span style="font-size:12.5px;color:var(--muted-ink);">Haz clic en una cita para saltar al texto</span>
         </div>
 
-        <div class="preset-bar" role="group" aria-label="Technical query presets">
-          <span class="preset-label">Presets:</span>
-          <button type="button" class="preset-btn active" data-preset-query="How does ERR-409-OPTIMISTIC-LOCK happen in distributed ledgers and how is it resolved?">
-            ERR-409-OPTIMISTIC-LOCK
-          </button>
-          <button type="button" class="preset-btn" data-preset-query="Why does AGA-8 raise DivergenceException at 230 bar in the Newton-Raphson solver?">
-            AGA-8 230 bar Newton-Raphson
-          </button>
-          <button type="button" class="preset-btn" data-preset-query="How does the Transactional Outbox pattern guarantee atomic event delivery to Kafka?">
-            Transactional Outbox Kafka
-          </button>
-          <button type="button" class="preset-btn" data-preset-query="Explain how Cortex Hybrid RAG combines BM25, pgvector, and Reciprocal Rank Fusion (RRF).">
-            BM25 + pgvector RRF
-          </button>
-          <button type="button" class="preset-btn" data-preset-query="How does OpenTelemetry W3C TraceContext propagate traceparent across multi-agent spans?">
-            OpenTelemetry traceparent
-          </button>
-        </div>
-
-        <form id="rag-query-form" class="query-form" novalidate>
-          <div class="field-group">
-            <label for="query-input" class="field-label">
-              <span>Technical Query</span>
-              <span class="font-mono" id="query-char-counter">84 / 2000 chars</span>
-            </label>
-            <input
-              id="query-input"
-              type="text"
-              class="input-text"
-              maxlength="2000"
-              value="How does ERR-409-OPTIMISTIC-LOCK happen in distributed ledgers and how is it resolved?"
-              placeholder="Enter an error code, architecture question, or protocol query..."
-              required
-            />
-          </div>
-
-          <div class="field-group">
-            <label for="topk-input" class="field-label">
-              <span>Top-K Chunks</span>
-              <span class="font-mono">int [1..10]</span>
-            </label>
-            <input
-              id="topk-input"
-              type="text"
-              inputmode="numeric"
-              class="input-num"
-              value="5"
-              aria-describedby="validation-banner"
-              required
-            />
-          </div>
-
-          <button type="submit" id="execute-query-btn" class="btn-primary">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-              <path d="M3 2.5L13 8L3 13.5V2.5Z" />
-            </svg>
-            <span>Execute Pipeline</span>
-          </button>
-        </form>
-
-        <div id="validation-banner" class="validation-banner" role="alert"></div>
-
-        <div class="console-meta-footer">
+        <div class="cx-scroll" id="cx-chat-scroll">
           <div>
-            Shortcut: press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to dispatch query through the 4-stage agent pipeline.
+            <p style="margin:0 0 8px;font-size:13.5px;color:var(--muted-ink);">Prueba una consulta directa sobre los manuales cargados:</p>
+            <div class="cx-starters">
+              <button type="button" class="cx-starter-chip" data-q="Como funciona la busqueda hibrida BM25 y pgvector RRF?">¿Cómo funciona la búsqueda híbrida?</button>
+              <button type="button" class="cx-starter-chip" data-q="Como se resuelve ERR-409-OPTIMISTIC-LOCK en el libro contable?">¿Cómo se resuelve ERR-409-OPTIMISTIC-LOCK?</button>
+              <button type="button" class="cx-starter-chip" data-q="Como verifica las citas y evita alucinaciones?">¿Cómo verifica las citas?</button>
+            </div>
           </div>
-          <div class="font-mono" id="last-audit-indicator">
-            AUDIT_ID: PENDING
-          </div>
+          <div id="cx-turns-list" style="display:flex;flex-direction:column;gap:18px;"></div>
         </div>
+
+        <form class="cx-ask-bar" id="cx-ask-form">
+          <label for="cx-question-input" class="sr-only" style="position:absolute;left:-9999px;">Escribe tu pregunta</label>
+          <input id="cx-question-input" class="cx-ask-input" type="text" placeholder="Pregunta sobre cualquier sección o código..." />
+          <button type="submit" class="cx-btn-primary" id="cx-send-btn">Preguntar</button>
+        </form>
       </section>
 
-      <!-- Bento Row 2: Multi-Agent Execution Trace (5 cols) + Grounded Synthesis & Citations (7 cols) -->
-      <section class="card col-5 reveal-block" aria-labelledby="trace-heading">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-index">02</span>
-            <h2 id="trace-heading" class="section-title">Multi-Agent Execution Trace</h2>
-          </div>
-          <span id="total-latency-badge" class="badge badge-neutral font-mono">0.00 ms</span>
+      <section class="cx-pane" aria-label="Lector de documentos fuente">
+        <div class="cx-pane-head">
+          <h2>Documentos fuente</h2>
+          <span class="cx-mono" id="cx-chunk-count" style="font-size:12.5px;color:var(--muted-ink);">0 secciones</span>
         </div>
-
-        <div class="trace-meta-strip">
-          <div class="mini-stat">
-            <div class="mini-stat-label">Routed Intent</div>
-            <div id="routed-intent-val" class="mini-stat-value">LEXICAL_EXACT</div>
-          </div>
-          <div class="mini-stat">
-            <div class="mini-stat-label">BM25 / Vec Weights</div>
-            <div id="routed-weights-val" class="mini-stat-value">0.75 / 0.25</div>
-          </div>
-          <div class="mini-stat">
-            <div class="mini-stat-label">Faithfulness</div>
-            <div id="trace-faithfulness-val" class="mini-stat-value">100.0%</div>
-          </div>
-        </div>
-
-        <div id="agent-trace-list" class="trace-list" aria-live="polite"></div>
+        <div class="cx-scroll" id="cx-docs-scroll"></div>
       </section>
+    </main>
 
-      <section class="card col-7 reveal-block" aria-labelledby="synthesis-heading">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-index">03</span>
-            <h2 id="synthesis-heading" class="section-title">Grounded Synthesis &amp; Verified Citations</h2>
-          </div>
-          <span id="faithfulness-status-badge" class="badge badge-green font-mono">FAITHFULNESS 1.0000 · VERIFIED</span>
+    <!-- Ingest Document Drawer -->
+    <div class="cx-backdrop" id="cx-ingest-backdrop" data-open="false" role="dialog" aria-modal="true">
+      <div class="cx-drawer">
+        <div class="cx-drawer-head">
+          <h2>Agregar documento</h2>
+          <button type="button" class="cx-btn-outline" id="cx-ingest-close">Cerrar</button>
         </div>
-
-        <div class="synthesis-box">
-          <div class="synthesis-meta-row">
-            <span class="font-mono" style="font-size: 0.74rem; color: var(--text-muted);">
-              SYNTHESIZER OUTPUT · INLINE PROVENANCE MARKERS
-            </span>
-            <span id="citation-count-badge" class="badge badge-blue font-mono">1 VERIFIED CITATION</span>
-          </div>
-          <p id="synthesized-answer-text" class="synthesis-answer"></p>
-        </div>
-
-        <div class="sub-heading">
-          <span>Verified Provenance Cards</span>
-          <span class="font-mono">Click [cite:id] badge to highlight</span>
-        </div>
-        <div id="verified-citations-grid" class="citations-grid"></div>
-      </section>
-
-      <!-- Bento Row 3: Hybrid Retrieval Candidates Table (Full Width) -->
-      <section class="card col-12 reveal-block" aria-labelledby="candidates-heading">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-index">04</span>
-            <h2 id="candidates-heading" class="section-title">Hybrid Retrieval Candidates (BM25 + Dense Vector + Weighted RRF)</h2>
-          </div>
-          <span class="section-subtitle font-mono">RRF(d) = w_bm25 / (60 + rank_bm25) + w_vec / (60 + rank_vec)</span>
-        </div>
-
-        <div class="table-wrap">
-          <table aria-label="Hybrid Retrieval Candidates">
-            <thead>
-              <tr>
-                <th>Fused Rank</th>
-                <th>Chunk ID</th>
-                <th>Section</th>
-                <th>Document Title</th>
-                <th>BM25 Rank</th>
-                <th>BM25 Score</th>
-                <th>Vector Rank</th>
-                <th>Vector Cosine</th>
-                <th>Fused RRF Score</th>
-                <th>Provenance</th>
-              </tr>
-            </thead>
-            <tbody id="candidates-table-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Bento Row 4: Automated Eval Harness & Append-Only Ledger Panel (Full Width) -->
-      <section class="card col-12 reveal-block" aria-labelledby="eval-heading">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-index">05</span>
-            <h2 id="eval-heading" class="section-title">Golden Dataset Evaluation Harness &amp; Append-Only Ledger</h2>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span id="eval-gate-badge" class="badge badge-green font-mono">QUALITY GATE READY</span>
-            <button type="button" id="run-eval-btn" class="btn-secondary">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path d="M2.5 8A5.5 5.5 0 1 1 4.2 12M2.5 12V8.5H6" />
-              </svg>
-              <span>Run Golden Eval Suite (5 Cases)</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Aggregate KPI Metrics -->
-        <div class="eval-kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-label">Avg Faithfulness</div>
-            <div id="eval-avg-faithfulness" class="kpi-value">--</div>
-            <div class="kpi-threshold">Gate &gt;= 0.7000</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Avg Citation Precision</div>
-            <div id="eval-avg-precision" class="kpi-value">--</div>
-            <div class="kpi-threshold">Gate &gt;= 0.7000</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Avg Context Recall</div>
-            <div id="eval-avg-recall" class="kpi-value">--</div>
-            <div class="kpi-threshold">Gate &gt;= 0.7500</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Avg Pipeline Latency</div>
-            <div id="eval-avg-latency" class="kpi-value">--</div>
-            <div class="kpi-threshold">Per-case mean (ms)</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Suite Pass Ratio</div>
-            <div id="eval-pass-ratio" class="kpi-value">--</div>
-            <div id="eval-run-id-sub" class="kpi-threshold">RUN_ID: NONE</div>
-          </div>
-        </div>
-
-        <div class="sub-heading">
-          <span>Golden Benchmark Cases (Per-Case Telemetry)</span>
-          <span class="font-mono">5 DETERMINISTIC GOLDEN CASES</span>
-        </div>
-        <div class="table-wrap" style="margin-bottom: 26px;">
-          <table aria-label="Golden Evaluation Case Results">
-            <thead>
-              <tr>
-                <th>Case ID</th>
-                <th>Benchmark Query</th>
-                <th>Routed Intent</th>
-                <th>Faithfulness</th>
-                <th>Citation Precision</th>
-                <th>Context Recall</th>
-                <th>Keyword Hit Rate</th>
-                <th>Latency</th>
-                <th>Gate Status</th>
-              </tr>
-            </thead>
-            <tbody id="eval-cases-table-body"></tbody>
-          </table>
-        </div>
-
-        <div class="sub-heading">
-          <span>Immutable Append-Only Evaluation Ledger (eval_runs_ledger)</span>
-          <span class="badge badge-yellow font-mono">BEFORE UPDATE / DELETE TRIGGER PROTECTED</span>
-        </div>
-        <div class="table-wrap">
-          <table aria-label="Immutable Evaluation Runs Ledger">
-            <thead>
-              <tr>
-                <th>Run ID</th>
-                <th>Cases Passed</th>
-                <th>Avg Faithfulness</th>
-                <th>Avg Precision</th>
-                <th>Avg Recall</th>
-                <th>Avg Latency</th>
-                <th>Gate Verdict</th>
-                <th>Recorded Timestamp (UTC)</th>
-              </tr>
-            </thead>
-            <tbody id="eval-ledger-table-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Bento Row 5: Seeded Knowledge Corpus Inspector -->
-      <section class="card col-12 reveal-block" aria-labelledby="corpus-heading">
-        <div class="section-header">
-          <div class="section-title-group">
-            <span class="section-index">06</span>
-            <h2 id="corpus-heading" class="section-title">Indexed Knowledge Corpus Inspector (document_chunks)</h2>
-          </div>
-          <span class="section-subtitle font-mono">Click any chunk card to load a targeted verification query</span>
-        </div>
-        <div id="corpus-inspector-grid" class="corpus-grid"></div>
-      </section>
+        <div class="cx-drawer-body" id="cx-ingest-body"></div>
+      </div>
     </div>
-  </main>
 
-  <script>
-    (function () {
-      "use strict";
+    <!-- Layer 2 Architecture Drawer -->
+    <div class="cx-backdrop" id="cx-arch-backdrop" data-open="false" role="dialog" aria-modal="true">
+      <div class="cx-drawer">
+        <div class="cx-drawer-head">
+          <h2>Pipeline RAG Híbrido &amp; Evals</h2>
+          <button type="button" class="cx-btn-outline" id="cx-arch-close">Cerrar</button>
+        </div>
+        <div class="cx-drawer-body" id="cx-arch-body"></div>
+      </div>
+    </div>
 
-      /* =====================================================================
-       * 1. STRICT NUMERIC & TYPE VALIDATION HELPERS (ui-strict-types.md)
-       * ===================================================================== */
+    <script>
+      (function () {
+        const state = {
+          chunks: [],
+          highlightedChunkId: null,
+          lastQueryResult: null,
+          evalRun: null,
+        };
 
-      /**
-       * Validates that a value is a finite number, returning fallback if NaN or invalid.
-       * @param {unknown} val
-       * @param {number} fallback
-       * @param {boolean} allowNegative
-       * @returns {number}
-       */
-      function safeNumber(val, fallback, allowNegative) {
-        var num = typeof val === "number" ? val : Number(val);
-        if (!Number.isFinite(num) || Number.isNaN(num)) {
-          return fallback;
-        }
-        if (!allowNegative && num < 0) {
-          return fallback;
-        }
-        return num;
-      }
+        const els = {
+          turns: document.getElementById("cx-turns-list"),
+          chatScroll: document.getElementById("cx-chat-scroll"),
+          docsScroll: document.getElementById("cx-docs-scroll"),
+          chunkCount: document.getElementById("cx-chunk-count"),
+          askForm: document.getElementById("cx-ask-form"),
+          askInput: document.getElementById("cx-question-input"),
+          sendBtn: document.getElementById("cx-send-btn"),
+          ingestBackdrop: document.getElementById("cx-ingest-backdrop"),
+          ingestBody: document.getElementById("cx-ingest-body"),
+          archBackdrop: document.getElementById("cx-arch-backdrop"),
+          archBody: document.getElementById("cx-arch-body"),
+        };
 
-      /**
-       * Formats a finite number to fixed decimals safely.
-       * @param {unknown} val
-       * @param {number} digits
-       * @returns {string}
-       */
-      function formatFixed(val, digits) {
-        var safe = safeNumber(val, 0, false);
-        return safe.toFixed(digits);
-      }
-
-      /**
-       * Formats a [0..1] ratio as percentage with 1 decimal place.
-       * @param {unknown} val
-       * @returns {string}
-       */
-      function formatPercent(val) {
-        var safe = Math.max(0, Math.min(1, safeNumber(val, 0, false)));
-        return (safe * 100).toFixed(1) + "%";
-      }
-
-      /**
-       * Strictly validates top_k input string as integer in [1..10].
-       * Rejects empty strings, NaN, negative values, decimals, or out-of-range integers.
-       * @param {string} rawValue
-       * @returns {{ valid: boolean, value: number, error: string }}
-       */
-      function validateTopKInput(rawValue) {
-        var trimmed = String(rawValue == null ? "" : rawValue).trim();
-        if (trimmed.length === 0) {
-          return {
-            valid: false,
-            value: 5,
-            error: "INVALID_TOP_K: top_k cannot be empty. Enter an integer between 1 and 10."
-          };
-        }
-        if (!/^-?\d+$/.test(trimmed)) {
-          return {
-            valid: false,
-            value: 5,
-            error: "INVALID_TOP_K: '" + trimmed + "' is not a clean integer (dangling decimals or non-numeric characters are forbidden)."
-          };
-        }
-        var parsed = Number(trimmed);
-        if (!Number.isSafeInteger(parsed) || Number.isNaN(parsed)) {
-          return {
-            valid: false,
-            value: 5,
-            error: "INVALID_TOP_K: top_k resolved to NaN or unsafe integer."
-          };
-        }
-        if (parsed < 1 || parsed > 10) {
-          return {
-            valid: false,
-            value: 5,
-            error: "OUT_OF_RANGE_TOP_K: top_k=" + String(parsed) + " violates bounds [1..10]."
-          };
-        }
-        return { valid: true, value: parsed, error: "" };
-      }
-
-      /* =====================================================================
-       * 2. SAFE DOM CONSTRUCTION (Zero unsafe HTML string injection)
-       * ===================================================================== */
-
-      /**
-       * Creates a DOM element safely using createElement and textContent.
-       * @param {string} tag
-       * @param {Record<string, string | undefined>} attrs
-       * @param {Array<Node | string>} children
-       * @returns {HTMLElement}
-       */
-      function createEl(tag, attrs, children) {
-        var element = document.createElement(tag);
-        if (attrs) {
-          var keys = Object.keys(attrs);
-          for (var i = 0; i < keys.length; i++) {
-            var k = keys[i];
-            var v = attrs[k];
-            if (v !== undefined && v !== null) {
-              if (k === "className") {
-                element.className = v;
-              } else if (k === "textContent") {
-                element.textContent = v;
-              } else {
-                element.setAttribute(k, v);
-              }
+        function el(tag, props, children) {
+          const node = document.createElement(tag);
+          if (props) {
+            for (const [k, v] of Object.entries(props)) {
+              if (k === "className") node.className = v;
+              else if (k === "textContent") node.textContent = v;
+              else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
+              else node.setAttribute(k, String(v));
             }
           }
-        }
-        if (children && children.length > 0) {
-          for (var j = 0; j < children.length; j++) {
-            var child = children[j];
-            if (child === null || child === undefined) continue;
-            if (typeof child === "string") {
-              element.appendChild(document.createTextNode(child));
-            } else {
-              element.appendChild(child);
+          if (Array.isArray(children)) {
+            for (const c of children) {
+              if (typeof c === "string") node.appendChild(document.createTextNode(c));
+              else if (c) node.appendChild(c);
             }
           }
+          return node;
         }
-        return element;
-      }
 
-      /* =====================================================================
-       * 3. STANDALONE DETERMINISTIC DOMAIN ENGINE (Exact Mirror of src/domain)
-       * ===================================================================== */
-
-      var SEEDED_CHUNKS = [
-        {
-          chunk_id: "chunk-rag-001",
-          doc_id: "DOC-RAG-ARCH-01",
-          title: "Hybrid Retrieval Architecture: BM25, pgvector, and Reciprocal Rank Fusion",
-          section: "retrieval-engine",
-          content: "Cortex Hybrid RAG combines Okapi BM25 lexical scoring (k1=1.5, b=0.75) with 64-dimensional L2-normalized pgvector dense cosine similarity using weighted Reciprocal Rank Fusion (RRF, k=60). Exact technical queries prioritize BM25 lexical matching while conceptual architecture queries weight pgvector dense embeddings higher through dynamic RRF fusion.",
-          tags: ["bm25", "pgvector", "rrf", "hybrid-rag", "embeddings"]
-        },
-        {
-          chunk_id: "chunk-err-409",
-          doc_id: "DOC-LEDGER-02",
-          title: "Concurrency Resolution for ERR-409-OPTIMISTIC-LOCK in Distributed Ledgers",
-          section: "error-catalog",
-          content: "Error code ERR-409-OPTIMISTIC-LOCK occurs when concurrent ledger writers conflict on aggregate sequence numbers, requiring SHA-256 idempotency key verification and exponential jitter backoff. Clients remediate ERR-409-OPTIMISTIC-LOCK by refreshing the latest aggregate version snapshot, validating idempotency state, and retrying with bounded backoff.",
-          tags: ["err-409-optimistic-lock", "err-409", "optimistic-locking", "idempotency", "ledger"]
-        },
-        {
-          chunk_id: "chunk-aga8-003",
-          doc_id: "DOC-SCADA-03",
-          title: "AGA-8 Supercritical Compressibility and Newton-Raphson DivergenceException",
-          section: "thermodynamics",
-          content: "During high-pressure custody transfer above 230 bar, the AGA-8 Gross Characterization solver raises DivergenceException when the Newton-Raphson compressibility root-finder exceeds 50 iterations. Operators prevent AGA-8 DivergenceException at 230 bar by clamping reduced density bounds and switching to the GERG-2008 fallback equation of state.",
-          tags: ["aga-8", "newton-raphson", "divergenceexception", "custody-transfer", "scada"]
-        },
-        {
-          chunk_id: "chunk-outbox-004",
-          doc_id: "DOC-KAFKA-04",
-          title: "Transactional Outbox Pattern with Kafka and Idempotent Consumers",
-          section: "event-streaming",
-          content: "The Transactional Outbox pattern guarantees atomic delivery of domain state mutations and outbound Kafka integration events within a single ACID database transaction. An asynchronous Transactional Outbox relay polls uncommitted rows in creation order and publishes to Kafka partitions while preserving ACID durability and idempotency.",
-          tags: ["transactional-outbox", "kafka", "cdc", "idempotency", "append-only"]
-        },
-        {
-          chunk_id: "chunk-raft-005",
-          doc_id: "DOC-DIST-05",
-          title: "Raft Consensus Quorum Leases and Split-Brain Fencing Tokens",
-          section: "consensus",
-          content: "Distributed storage clusters prevent split-brain writes during network partitions by requiring a strict Raft majority quorum and monotonically increasing epoch fencing tokens. Any isolated Raft leader whose quorum lease expires or whose fencing token is superseded is immediately rejected by storage nodes.",
-          tags: ["raft", "quorum", "fencing-token", "split-brain", "distributed-systems"]
-        },
-        {
-          chunk_id: "chunk-otel-006",
-          doc_id: "DOC-OBS-06",
-          title: "OpenTelemetry W3C TraceContext Propagation Across Multi-Agent Pipelines",
-          section: "observability",
-          content: "Every multi-agent orchestration request propagates OpenTelemetry W3C TraceContext headers (traceparent and tracestate) across RouterAgent, HybridRetrieverAgent, SynthesizerAgent, and CitationGuardrailAgent spans. OpenTelemetry span attributes capture per-agent latency_ms, RRF candidate scores, and faithfulness verification status.",
-          tags: ["opentelemetry", "traceparent", "w3c-tracecontext", "multi-agent", "telemetry"]
-        },
-        {
-          chunk_id: "chunk-sqlite-007",
-          doc_id: "DOC-MOBILE-07",
-          title: "Offline-First SQLite Sync Queues and Causal Lamport Clocks",
-          section: "edge-sync",
-          content: "Field edge clients persist telemetry mutations in an append-only Offline-First SQLite sync queue stamped with monotonic Lamport clocks to preserve causal ordering during reconnection. Upon network recovery, the Offline-First SQLite engine drains pending mutations in causal Lamport order and resolves conflicts deterministically.",
-          tags: ["sqlite", "offline-first", "sync-queue", "lamport-clock", "crdt"]
-        },
-        {
-          chunk_id: "chunk-guard-008",
-          doc_id: "DOC-RAG-GUARD-08",
-          title: "Citation Guardrails, Grounding Verification, and Append-Only Audit Ledgers",
-          section: "guardrails",
-          content: "CitationGuardrailAgent enforces strict grounding by verifying that every synthesized claim carries a valid [cite:chunk_id] marker matching retrieved evidence and achieves a faithfulness_score of at least 0.65. Verified responses are recorded in the immutable append-only query_audit_log protected by database triggers against UPDATE or DELETE.",
-          tags: ["citation-guardrail", "faithfulness", "ungroundedclaimerror", "append-only", "audit-ledger"]
+        async function loadChunks() {
+          const resp = await fetch("/api/v1/chunks");
+          const data = await resp.json();
+          state.chunks = data.chunks || [];
+          els.chunkCount.textContent = state.chunks.length + " secciones";
+          renderDocs();
         }
-      ];
 
-      var GOLDEN_EVAL_CASES = [
-        {
-          case_id: "eval-001",
-          query: "How does ERR-409-OPTIMISTIC-LOCK happen in distributed ledgers and how is it resolved?",
-          expected_chunk_ids: ["chunk-err-409"],
-          expected_keywords: ["ERR-409-OPTIMISTIC-LOCK", "idempotency", "backoff"]
-        },
-        {
-          case_id: "eval-002",
-          query: "Why does AGA-8 raise DivergenceException at 230 bar in the Newton-Raphson solver?",
-          expected_chunk_ids: ["chunk-aga8-003"],
-          expected_keywords: ["AGA-8", "DivergenceException", "230"]
-        },
-        {
-          case_id: "eval-003",
-          query: "Explain how Cortex Hybrid RAG combines BM25, pgvector, and Reciprocal Rank Fusion (RRF).",
-          expected_chunk_ids: ["chunk-rag-001"],
-          expected_keywords: ["BM25", "pgvector", "RRF"]
-        },
-        {
-          case_id: "eval-004",
-          query: "How does the Transactional Outbox pattern guarantee atomic event delivery to Kafka?",
-          expected_chunk_ids: ["chunk-outbox-004"],
-          expected_keywords: ["Outbox", "Kafka", "ACID"]
-        },
-        {
-          case_id: "eval-005",
-          query: "How do Offline-First SQLite sync queues preserve causal ordering on edge devices?",
-          expected_chunk_ids: ["chunk-sqlite-007"],
-          expected_keywords: ["SQLite", "Lamport", "causal"]
-        }
-      ];
-
-      var STOPWORDS = {
-        a: 1, an: 1, and: 1, are: 1, as: 1, at: 1, be: 1, by: 1, can: 1, do: 1,
-        does: 1, for: 1, from: 1, how: 1, in: 1, into: 1, is: 1, it: 1, its: 1,
-        of: 1, on: 1, or: 1, that: 1, the: 1, their: 1, this: 1, to: 1, was: 1,
-        were: 1, what: 1, when: 1, where: 1, which: 1, who: 1, why: 1, with: 1
-      };
-
-      var CONCEPT_CLUSTERS = {
-        "concept:hybrid_retrieval": ["hybrid", "bm25", "lexical", "semantic", "dense", "vector", "rrf", "reciprocal", "rank", "fusion", "retrieval", "retriever", "search", "scoring", "cosine", "embedding", "embeddings", "pgvector"],
-        "concept:guardrails_grounding": ["citation", "citations", "cite", "guardrail", "guardrails", "grounding", "grounded", "faithfulness", "hallucination", "hallucinations", "ungrounded", "verification", "verify", "provenance", "evidence"],
-        "concept:multi_agent_routing": ["router", "routing", "intent", "agent", "agents", "multi-agent", "multiagent", "pipeline", "orchestrator", "orchestration", "synthesizer", "synthesis", "trace", "traces", "opentelemetry", "traceparent"],
-        "concept:evaluation_quality": ["eval", "evaluation", "harness", "recall", "precision", "golden", "regression", "benchmark", "metric", "metrics", "gate", "latency", "threshold"],
-        "concept:distributed_consensus": ["raft", "consensus", "quorum", "leader", "follower", "replication", "split-brain", "fencing", "lease", "epoch", "partition", "failover"],
-        "concept:ledger_idempotency": ["ledger", "outbox", "idempotency", "idempotent", "append-only", "audit", "hash", "sha-256", "sha256", "immutability", "immutable", "transaction", "concurrency", "err-409", "conflict", "kafka", "acid"],
-        "concept:telemetry_custody": ["aga-8", "api-mpms", "telemetry", "scada", "modbus", "custody", "compressibility", "flow", "meter", "pressure", "temperature", "newton-raphson", "divergenceexception"]
-      };
-
-      function tokenize(text) {
-        if (!text) return [];
-        var matches = String(text).toLowerCase().match(/[a-z0-9]+(?:[-_][a-z0-9]+)*/g);
-        return matches ? matches : [];
-      }
-
-      function stemToken(token) {
-        if (token.length <= 4 || token.indexOf("-") !== -1 || token.indexOf("_") !== -1 || /\d/.test(token)) {
-          return token;
-        }
-        var suffixes = ["ations", "ation", "ingly", "ments", "ment", "ities", "ity", "ings", "ing", "edly", "ness", "ives", "ive", "ions", "ion", "ies", "es", "ed", "ly", "s"];
-        for (var i = 0; i < suffixes.length; i++) {
-          var suf = suffixes[i];
-          if (token.endsWith(suf) && token.length - suf.length >= 3) {
-            var base = token.slice(0, token.length - suf.length);
-            return suf === "ies" ? base + "y" : base;
-          }
-        }
-        return token;
-      }
-
-      function expandTokens(tokens) {
-        var expanded = [];
-        for (var i = 0; i < tokens.length; i++) {
-          var tok = tokens[i];
-          expanded.push(tok);
-          var st = stemToken(tok);
-          if (st !== tok) expanded.push(st);
-          if (tok.indexOf("-") !== -1 || tok.indexOf("_") !== -1) {
-            var parts = tok.split(/[-_]+/);
-            for (var j = 0; j < parts.length; j++) {
-              if (parts[j]) expanded.push(parts[j]);
-            }
-          }
-        }
-        return expanded;
-      }
-
-      function fnvHash(str, salt) {
-        var input = salt + ":" + str;
-        var h = 2166136261 >>> 0;
-        for (var i = 0; i < input.length; i++) {
-          h ^= input.charCodeAt(i);
-          h = Math.imul(h, 16777619) >>> 0;
-        }
-        return h;
-      }
-
-      function computeDeterministicEmbedding(text, dim) {
-        var d = dim || 64;
-        var rawTokens = tokenize(text);
-        var vec = new Array(d).fill(0);
-        if (rawTokens.length === 0) return vec;
-
-        var contentTokens = rawTokens.filter(function (t) { return !STOPWORDS[t]; });
-        if (contentTokens.length === 0) contentTokens = rawTokens;
-
-        var features = [];
-        var tokenSet = {};
-        var stemSet = {};
-        for (var i = 0; i < contentTokens.length; i++) {
-          var t = contentTokens[i];
-          var st = stemToken(t);
-          tokenSet[t] = true;
-          stemSet[st] = true;
-          features.push(["tok:" + t, 2.2]);
-          features.push(["stem:" + st, 1.8]);
-          if (st.length >= 4) {
-            features.push(["pref4:" + st.slice(0, 4), 0.9]);
-          }
-          if (t.indexOf("-") !== -1 || t.indexOf("_") !== -1) {
-            var subParts = t.split(/[-_]+/);
-            for (var sp = 0; sp < subParts.length; sp++) {
-              if (subParts[sp]) features.push(["sub:" + subParts[sp], 1.4]);
-            }
+        function focusChunk(chunkId) {
+          state.highlightedChunkId = chunkId;
+          renderDocs();
+          const target = document.getElementById("doc-chunk-" + chunkId);
+          if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
           }
         }
 
-        var clusterNames = Object.keys(CONCEPT_CLUSTERS);
-        for (var c = 0; c < clusterNames.length; c++) {
-          var cname = clusterNames[c];
-          var kws = CONCEPT_CLUSTERS[cname];
-          var hits = 0;
-          for (var k = 0; k < kws.length; k++) {
-            var kw = kws[k];
-            if (tokenSet[kw] || stemSet[stemToken(kw)]) hits++;
-          }
-          if (hits > 0) {
-            features.push([cname, 1.75 * Math.min(2.5, 1.0 + 0.4 * (hits - 1))]);
-          }
-        }
-
-        for (var f = 0; f < features.length; f++) {
-          var feat = features[f][0];
-          var weight = features[f][1];
-          var h1 = fnvHash(feat, "p1");
-          var h2 = fnvHash(feat, "p2");
-          var b1 = h1 % d;
-          var s1 = ((h1 >>> 16) & 1) === 0 ? 1.0 : -1.0;
-          var b2 = h2 % d;
-          var s2 = ((h2 >>> 16) & 1) === 0 ? 1.0 : -1.0;
-          vec[b1] += s1 * weight;
-          vec[b2] += s2 * (weight * 0.5);
-        }
-
-        var sumSq = 0;
-        for (var n = 0; n < d; n++) sumSq += vec[n] * vec[n];
-        var norm = Math.sqrt(sumSq);
-        if (norm <= 1e-12) {
-          vec[0] = 1.0;
-          return vec;
-        }
-        for (var m = 0; m < d; m++) {
-          vec[m] = Number((vec[m] / norm).toFixed(8));
-        }
-        return vec;
-      }
-
-      function cosineSimilarity(vecA, vecB) {
-        if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-        var dot = 0;
-        var na = 0;
-        var nb = 0;
-        for (var i = 0; i < vecA.length; i++) {
-          dot += vecA[i] * vecB[i];
-          na += vecA[i] * vecA[i];
-          nb += vecB[i] * vecB[i];
-        }
-        if (na <= 1e-12 || nb <= 1e-12) return 0;
-        return Math.max(-1, Math.min(1, Number((dot / (Math.sqrt(na) * Math.sqrt(nb))).toFixed(6))));
-      }
-
-      function routeQueryIntent(query) {
-        var cleaned = String(query || "").trim();
-        var tokens = tokenize(cleaned);
-        var exactCodePattern = /(?:\b(?:err|aga|rfc|iso|cve|http|api|sha|ieee|nist|ansi)[-_]?\d+[a-z0-9_-]*\b|--[a-z0-9_-]+|\b(?:k1|rrf_k|top_k|b)\s*=\s*\d+(?:\.\d+)?|\b\d+\.\d+\b)/i;
-        var analyticalTerms = { compare: 1, comparison: 1, versus: 1, vs: 1, tradeoff: 1, tradeoffs: 1, analyze: 1, analysis: 1, combine: 1, combines: 1, combining: 1, fusion: 1, balance: 1, between: 1, difference: 1, evaluate: 1, hybrid: 1 };
-        var conceptualTerms = { how: 1, why: 1, architecture: 1, conceptual: 1, explain: 1, design: 1, principle: 1, overview: 1, mechanism: 1, workflow: 1, pattern: 1, prevent: 1, ensure: 1, guarantee: 1, propagate: 1, preserve: 1 };
-
-        var hasExact = exactCodePattern.test(cleaned);
-        var hasAnalytical = tokens.some(function (t) { return Boolean(analyticalTerms[t]); });
-        var hasConceptual = tokens.some(function (t) { return Boolean(conceptualTerms[t]); });
-
-        var intent = "HYBRID_ANALYTICAL";
-        if (hasExact && !hasAnalytical) {
-          intent = "LEXICAL_EXACT";
-        } else if (hasAnalytical) {
-          intent = "HYBRID_ANALYTICAL";
-        } else if (hasConceptual) {
-          intent = "SEMANTIC_CONCEPTUAL";
-        }
-
-        var weights = {
-          LEXICAL_EXACT: { bm25: 0.75, vec: 0.25 },
-          SEMANTIC_CONCEPTUAL: { bm25: 0.35, vec: 0.65 },
-          HYBRID_ANALYTICAL: { bm25: 0.50, vec: 0.50 }
-        }[intent];
-
-        return {
-          intent: intent,
-          bm25_weight: weights.bm25,
-          vector_weight: weights.vec
-        };
-      }
-
-      function runLocalHybridPipeline(query, topK, corpus) {
-        var tStart = performance.now();
-        var decision = routeQueryIntent(query);
-        var tRouter = Math.max(0.12, Number((performance.now() - tStart).toFixed(3)));
-
-        var tRetStart = performance.now();
-        var rawQueryTokens = tokenize(query);
-        var queryTokens = expandTokens(rawQueryTokens).filter(function (t) { return !STOPWORDS[t]; });
-        if (queryTokens.length === 0) queryTokens = expandTokens(rawQueryTokens);
-
-        var docTokensList = corpus.map(function (c) {
-          var header = c.title + " " + c.title + " " + c.section + " " + (c.tags || []).join(" ") + " " + (c.tags || []).join(" ");
-          return expandTokens(tokenize(header + " " + c.content));
-        });
-
-        var numDocs = corpus.length;
-        var avgdl = docTokensList.reduce(function (acc, list) { return acc + list.length; }, 0) / Math.max(1, numDocs);
-        var k1 = 1.5;
-        var b = 0.75;
-
-        var docCounters = docTokensList.map(function (list) {
-          var map = {};
-          for (var i = 0; i < list.length; i++) {
-            var tok = list[i];
-            map[tok] = (map[tok] || 0) + 1;
-          }
-          return map;
-        });
-
-        var dfMap = {};
-        for (var q = 0; q < queryTokens.length; q++) {
-          var term = queryTokens[q];
-          if (dfMap[term] === undefined) {
-            var df = 0;
-            for (var d = 0; d < docCounters.length; d++) {
-              if (docCounters[d][term] > 0) df++;
-            }
-            dfMap[term] = df;
-          }
-        }
-
-        var bm25Scores = docCounters.map(function (counts, idx) {
-          var dl = docTokensList[idx].length;
-          var score = 0;
-          var normFactor = k1 * (1 - b + b * (dl / avgdl));
-          for (var i = 0; i < queryTokens.length; i++) {
-            var qt = queryTokens[i];
-            var tf = counts[qt] || 0;
-            if (tf <= 0) continue;
-            var df = dfMap[qt] || 0;
-            var idf = Math.log(1 + (numDocs - df + 0.5) / (df + 0.5));
-            score += idf * ((tf * (k1 + 1)) / (tf + normFactor));
-          }
-          return Number(score.toFixed(6));
-        });
-
-        var queryVec = computeDeterministicEmbedding(query, 64);
-        var vectorScores = corpus.map(function (chunk) {
-          var rich = chunk.title + " " + chunk.section + " " + (chunk.tags || []).join(" ") + " " + chunk.content;
-          var chunkVec = computeDeterministicEmbedding(rich, 64);
-          return cosineSimilarity(queryVec, chunkVec);
-        });
-
-        var indices = corpus.map(function (_, idx) { return idx; });
-        var bm25Order = indices.slice().sort(function (a, bIdx) {
-          if (bm25Scores[bIdx] !== bm25Scores[a]) return bm25Scores[bIdx] - bm25Scores[a];
-          return vectorScores[bIdx] - vectorScores[a];
-        });
-        var vecOrder = indices.slice().sort(function (a, bIdx) {
-          if (vectorScores[bIdx] !== vectorScores[a]) return vectorScores[bIdx] - vectorScores[a];
-          return bm25Scores[bIdx] - bm25Scores[a];
-        });
-
-        var bm25Ranks = {};
-        var vecRanks = {};
-        bm25Order.forEach(function (docIdx, r) { bm25Ranks[docIdx] = r + 1; });
-        vecOrder.forEach(function (docIdx, r) { vecRanks[docIdx] = r + 1; });
-
-        var rrfK = 60;
-        var allCandidates = corpus.map(function (chunk, idx) {
-          var bRank = bm25Ranks[idx];
-          var vRank = vecRanks[idx];
-          var rrf = (decision.bm25_weight / (rrfK + bRank)) + (decision.vector_weight / (rrfK + vRank));
-          return {
-            chunk: chunk,
-            bm25_score: bm25Scores[idx],
-            vector_score: vectorScores[idx],
-            bm25_rank: bRank,
-            vector_rank: vRank,
-            rrf_score: Number(rrf.toFixed(8))
-          };
-        });
-
-        allCandidates.sort(function (a, bCand) {
-          if (bCand.rrf_score !== a.rrf_score) return bCand.rrf_score - a.rrf_score;
-          var wA = a.bm25_score * decision.bm25_weight + a.vector_score * decision.vector_weight;
-          var wB = bCand.bm25_score * decision.bm25_weight + bCand.vector_score * decision.vector_weight;
-          return wB - wA;
-        });
-
-        var candidates = allCandidates.slice(0, topK);
-        var tRetrieval = Math.max(0.28, Number((performance.now() - tRetStart).toFixed(3)));
-
-        var tSynthStart = performance.now();
-        var topCandidate = candidates[0];
-        var answer = topCandidate.chunk.title + " (" + topCandidate.chunk.section + "): " + topCandidate.chunk.content + " [cite:" + topCandidate.chunk.chunk_id + "]";
-        var tSynth = Math.max(0.15, Number((performance.now() - tSynthStart).toFixed(3)));
-
-        var tGuardStart = performance.now();
-        var faithfulness = 0.964;
-        var excerpt = topCandidate.chunk.content.length > 180
-          ? topCandidate.chunk.content.slice(0, 180).trim() + "..."
-          : topCandidate.chunk.content;
-        var citations = [
-          {
-            chunk_id: topCandidate.chunk.chunk_id,
-            doc_id: topCandidate.chunk.doc_id,
-            title: topCandidate.chunk.title,
-            section: topCandidate.chunk.section,
-            excerpt: excerpt,
-            rrf_score: topCandidate.rrf_score
-          }
-        ];
-        var tGuard = Math.max(0.14, Number((performance.now() - tGuardStart).toFixed(3)));
-        var totalLatency = Number((tRouter + tRetrieval + tSynth + tGuard).toFixed(3));
-
-        var traces = [
-          {
-            agent_name: "RouterAgent",
-            action: "classify_intent",
-            detail: "intent=" + decision.intent + " (bm25_weight=" + decision.bm25_weight.toFixed(2) + ", vector_weight=" + decision.vector_weight.toFixed(2) + ")",
-            duration_ms: tRouter
-          },
-          {
-            agent_name: "HybridRetrieverAgent",
-            action: "hybrid_rrf_search",
-            detail: "retrieved=" + candidates.length + " top_chunk=" + topCandidate.chunk.chunk_id + " top_rrf=" + topCandidate.rrf_score.toFixed(6),
-            duration_ms: tRetrieval
-          },
-          {
-            agent_name: "SynthesizerAgent",
-            action: "grounded_synthesis",
-            detail: "synthesized_chars=" + answer.length + " cited_chunks=1",
-            duration_ms: tSynth
-          },
-          {
-            agent_name: "CitationGuardrailAgent",
-            action: "verify_citations_and_grounding",
-            detail: "verified_citations=1 faithfulness=" + faithfulness.toFixed(4),
-            duration_ms: tGuard
-          }
-        ];
-
-        return {
-          audit_id: "aud-local-" + Math.random().toString(16).slice(2, 10),
-          query: query.trim(),
-          intent: decision.intent,
-          answer: answer,
-          citations: citations,
-          candidates: candidates,
-          traces: traces,
-          faithfulness_score: faithfulness,
-          total_latency_ms: totalLatency
-        };
-      }
-
-      /* =====================================================================
-       * 4. APPLICATION STATE & PAYLOAD NORMALIZERS
-       * ===================================================================== */
-
-      var appState = {
-        mode: "STANDALONE", // "API" | "STANDALONE"
-        corpus: SEEDED_CHUNKS.slice(),
-        evalLedger: [],
-        lastEvalReport: null
-      };
-
-      function normalizeCandidate(raw) {
-        var chunkObj = raw.chunk || {
-          chunk_id: raw.chunk_id || "unknown",
-          doc_id: raw.doc_id || "DOC-UNKNOWN",
-          title: raw.title || "Untitled Chunk",
-          section: raw.section || "general",
-          content: raw.content || "",
-          tags: raw.tags || []
-        };
-        return {
-          chunk: chunkObj,
-          bm25_rank: Math.max(1, Math.round(safeNumber(raw.bm25_rank, 1, false))),
-          bm25_score: safeNumber(raw.bm25_score, 0, false),
-          vector_rank: Math.max(1, Math.round(safeNumber(raw.vector_rank, 1, false))),
-          vector_score: safeNumber(raw.vector_score, 0, true),
-          rrf_score: safeNumber(raw.rrf_score, 0, false)
-        };
-      }
-
-      function normalizeRagResponse(payload) {
-        var root = payload && payload.data ? payload.data : payload;
-        return {
-          audit_id: String(root.audit_id || "aud-" + Date.now().toString(16).slice(-8)),
-          query: String(root.query || ""),
-          intent: String(root.intent || "HYBRID_ANALYTICAL"),
-          answer: String(root.answer || ""),
-          citations: Array.isArray(root.citations) ? root.citations : [],
-          candidates: Array.isArray(root.candidates) ? root.candidates.map(normalizeCandidate) : [],
-          traces: Array.isArray(root.traces) ? root.traces : [],
-          faithfulness_score: safeNumber(root.faithfulness_score, 0, false),
-          total_latency_ms: safeNumber(root.total_latency_ms, 0, false)
-        };
-      }
-
-      /* =====================================================================
-       * 5. DOM RENDERERS (Safe createElement / replaceChildren)
-       * ===================================================================== */
-
-      function updateHeaderStatus() {
-        var modeBadge = document.getElementById("system-mode-badge");
-        var modeText = document.getElementById("system-mode-text");
-        var corpusBadge = document.getElementById("corpus-count-badge");
-
-        if (appState.mode === "API") {
-          modeBadge.className = "badge badge-green font-mono";
-          modeText.textContent = "ONLINE · API";
-        } else {
-          modeBadge.className = "badge badge-blue font-mono";
-          modeText.textContent = "STANDALONE · LOCAL ENGINE";
-        }
-        corpusBadge.textContent = String(appState.corpus.length) + " CHUNKS · 64-D L2";
-      }
-
-      function renderAnswerWithCitations(answerText) {
-        var container = document.getElementById("synthesized-answer-text");
-        var nodes = [];
-        var regex = /\[cite:([a-zA-Z0-9_.:-]+)\]/g;
-        var lastIndex = 0;
-        var match;
-
-        while ((match = regex.exec(answerText)) !== null) {
-          if (match.index > lastIndex) {
-            nodes.push(document.createTextNode(answerText.slice(lastIndex, match.index)));
-          }
-          var citedId = match[1];
-          var pill = createEl(
-            "button",
-            {
-              type: "button",
-              className: "cite-pill",
-              "data-cite-target": citedId,
-              title: "Jump to verified citation " + citedId
-            },
-            ["[cite:" + citedId + "]"]
-          );
-          pill.addEventListener("click", (function (targetId) {
-            return function () {
-              highlightCitationCard(targetId);
-            };
-          })(citedId));
-          nodes.push(pill);
-          lastIndex = regex.lastIndex;
-        }
-
-        if (lastIndex < answerText.length) {
-          nodes.push(document.createTextNode(answerText.slice(lastIndex)));
-        }
-
-        container.replaceChildren.apply(container, nodes);
-      }
-
-      function highlightCitationCard(chunkId) {
-        var cards = document.querySelectorAll(".citation-card");
-        for (var i = 0; i < cards.length; i++) {
-          var card = cards[i];
-          if (card.getAttribute("data-chunk-id") === chunkId) {
-            card.classList.add("highlighted");
-            card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          } else {
-            card.classList.remove("highlighted");
-          }
-        }
-      }
-
-      function renderRagResponse(resp) {
-        document.getElementById("last-audit-indicator").textContent = "AUDIT_ID: " + resp.audit_id;
-        document.getElementById("total-latency-badge").textContent = formatFixed(resp.total_latency_ms, 2) + " ms";
-        document.getElementById("routed-intent-val").textContent = resp.intent;
-
-        var weightLabel = "0.50 / 0.50";
-        if (resp.intent === "LEXICAL_EXACT") weightLabel = "0.75 / 0.25";
-        else if (resp.intent === "SEMANTIC_CONCEPTUAL") weightLabel = "0.35 / 0.65";
-        document.getElementById("routed-weights-val").textContent = weightLabel;
-        document.getElementById("trace-faithfulness-val").textContent = formatPercent(resp.faithfulness_score);
-
-        // Render Multi-Agent Trace steps
-        var traceList = document.getElementById("agent-trace-list");
-        var traceNodes = resp.traces.map(function (step, idx) {
-          return createEl("div", { className: "trace-item" }, [
-            createEl("div", { className: "trace-item-top" }, [
-              createEl("div", { className: "trace-agent-name" }, [
-                createEl("span", { className: "trace-step-num font-mono" }, [String(idx + 1)]),
-                createEl("span", {}, [String(step.agent_name || "Agent")])
-              ]),
-              createEl("span", { className: "trace-action" }, [String(step.action || "step")]),
-              createEl("span", { className: "trace-duration" }, [formatFixed(step.duration_ms, 3) + " ms"])
-            ]),
-            createEl("div", { className: "trace-detail" }, [String(step.detail || "")])
-          ]);
-        });
-        traceList.replaceChildren.apply(traceList, traceNodes);
-
-        // Render Grounded Synthesis
-        var faithBadge = document.getElementById("faithfulness-status-badge");
-        var fScore = safeNumber(resp.faithfulness_score, 0, false);
-        faithBadge.className = fScore >= 0.65 ? "badge badge-green font-mono" : "badge badge-red font-mono";
-        faithBadge.textContent = "FAITHFULNESS " + formatFixed(fScore, 4) + (fScore >= 0.65 ? " · VERIFIED" : " · UNGROUNDED");
-
-        var citCountBadge = document.getElementById("citation-count-badge");
-        citCountBadge.textContent = String(resp.citations.length) + (resp.citations.length === 1 ? " VERIFIED CITATION" : " VERIFIED CITATIONS");
-
-        renderAnswerWithCitations(resp.answer);
-
-        // Render Verified Citations Grid
-        var citGrid = document.getElementById("verified-citations-grid");
-        var citNodes = resp.citations.map(function (cit) {
-          return createEl(
-            "article",
-            { className: "citation-card", "data-chunk-id": String(cit.chunk_id) },
-            [
-              createEl("div", { className: "citation-card-top" }, [
-                createEl("span", { className: "badge badge-blue font-mono" }, [String(cit.chunk_id)]),
-                createEl("span", { className: "font-mono", style: "font-size: 0.74rem; color: var(--text-muted);" }, [
-                  "RRF " + formatFixed(cit.rrf_score, 6)
-                ])
-              ]),
-              createEl("h3", { className: "citation-title" }, [String(cit.title)]),
-              createEl("div", { className: "font-mono", style: "font-size: 0.72rem; color: var(--text-muted);" }, [
-                String(cit.doc_id || "DOC") + " · section: " + String(cit.section)
-              ]),
-              createEl("p", { className: "citation-excerpt" }, [String(cit.excerpt)])
-            ]
-          );
-        });
-        citGrid.replaceChildren.apply(citGrid, citNodes);
-
-        // Render Hybrid Retrieval Candidates Table
-        var citedSet = {};
-        resp.citations.forEach(function (c) { citedSet[c.chunk_id] = true; });
-
-        var tbody = document.getElementById("candidates-table-body");
-        var rows = resp.candidates.map(function (cand, index) {
-          var isCited = Boolean(citedSet[cand.chunk.chunk_id]);
-          return createEl("tr", {}, [
-            createEl("td", { className: "font-mono" }, ["#" + String(index + 1)]),
-            createEl("td", { className: "font-mono", style: "font-weight: 600; color: var(--text-primary);" }, [
-              String(cand.chunk.chunk_id)
-            ]),
-            createEl("td", {}, [
-              createEl("span", { className: "badge badge-neutral font-mono" }, [String(cand.chunk.section)])
-            ]),
-            createEl("td", { style: "color: var(--text-primary); font-weight: 500;" }, [String(cand.chunk.title)]),
-            createEl("td", { className: "font-mono" }, ["#" + String(cand.bm25_rank)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(cand.bm25_score, 4)]),
-            createEl("td", { className: "font-mono" }, ["#" + String(cand.vector_rank)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(cand.vector_score, 4)]),
-            createEl("td", { className: "font-mono", style: "font-weight: 600; color: var(--pastel-blue-fg);" }, [
-              formatFixed(cand.rrf_score, 6)
-            ]),
-            createEl("td", {}, [
-              createEl(
-                "span",
-                { className: isCited ? "badge badge-green font-mono" : "badge badge-neutral font-mono" },
-                [isCited ? "CITED IN ANSWER" : "CANDIDATE"]
-              )
-            ])
-          ]);
-        });
-        tbody.replaceChildren.apply(tbody, rows);
-      }
-
-      function renderEvalReport(report) {
-        var root = report && report.data ? report.data : report;
-        document.getElementById("eval-avg-faithfulness").textContent = formatFixed(root.avg_faithfulness, 4);
-        document.getElementById("eval-avg-precision").textContent = formatFixed(root.avg_citation_precision, 4);
-        document.getElementById("eval-avg-recall").textContent = formatFixed(root.avg_context_recall, 4);
-        document.getElementById("eval-avg-latency").textContent = formatFixed(root.avg_latency_ms, 2) + " ms";
-        document.getElementById("eval-pass-ratio").textContent =
-          String(safeNumber(root.passed_cases, 0, false)) + " / " + String(safeNumber(root.total_cases, 0, false));
-        document.getElementById("eval-run-id-sub").textContent = "RUN_ID: " + String(root.run_id || "eval-local");
-
-        var gateBadge = document.getElementById("eval-gate-badge");
-        if (root.passed_gate) {
-          gateBadge.className = "badge badge-green font-mono";
-          gateBadge.textContent = "GATE PASSED · CERTIFIED";
-        } else {
-          gateBadge.className = "badge badge-red font-mono";
-          gateBadge.textContent = "GATE REGRESSION";
-        }
-
-        var casesBody = document.getElementById("eval-cases-table-body");
-        var results = Array.isArray(root.results) ? root.results : [];
-        var caseRows = results.map(function (r) {
-          return createEl("tr", {}, [
-            createEl("td", { className: "font-mono", style: "font-weight: 600; color: var(--text-primary);" }, [
-              String(r.case_id)
-            ]),
-            createEl("td", { style: "color: var(--text-primary);" }, [String(r.query)]),
-            createEl("td", {}, [
-              createEl("span", { className: "badge badge-blue font-mono" }, [String(r.intent)])
-            ]),
-            createEl("td", { className: "font-mono" }, [formatFixed(r.faithfulness, 4)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(r.citation_precision, 4)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(r.context_recall, 4)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(r.keyword_hit_rate != null ? r.keyword_hit_rate : 1.0, 2)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(r.latency_ms, 2) + " ms"]),
-            createEl("td", {}, [
-              createEl(
-                "span",
-                { className: r.passed ? "badge badge-green font-mono" : "badge badge-red font-mono" },
-                [r.passed ? "PASS" : "FAIL"]
-              )
-            ])
-          ]);
-        });
-        casesBody.replaceChildren.apply(casesBody, caseRows);
-      }
-
-      function renderEvalLedger(entries) {
-        var tbody = document.getElementById("eval-ledger-table-body");
-        if (!entries || entries.length === 0) {
-          var emptyRow = createEl("tr", {}, [
-            createEl("td", { colspan: "8", className: "font-mono", style: "text-align: center; color: var(--text-muted);" }, [
-              "No evaluation runs recorded yet. Click 'Run Golden Eval Suite (5 Cases)' to append an immutable ledger record."
-            ])
-          ]);
-          tbody.replaceChildren(emptyRow);
-          return;
-        }
-
-        var rows = entries.map(function (item) {
-          var passedGate = Boolean(item.passed_gate);
-          return createEl("tr", {}, [
-            createEl("td", { className: "font-mono", style: "font-weight: 600; color: var(--text-primary);" }, [
-              String(item.run_id)
-            ]),
-            createEl("td", { className: "font-mono" }, [
-              String(safeNumber(item.passed_cases, 0, false)) + " / " + String(safeNumber(item.total_cases, 0, false))
-            ]),
-            createEl("td", { className: "font-mono" }, [formatFixed(item.avg_faithfulness, 4)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(item.avg_citation_precision, 4)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(item.avg_context_recall, 4)]),
-            createEl("td", { className: "font-mono" }, [formatFixed(item.avg_latency_ms, 2) + " ms"]),
-            createEl("td", {}, [
-              createEl(
-                "span",
-                { className: passedGate ? "badge badge-green font-mono" : "badge badge-red font-mono" },
-                [passedGate ? "PASSED GATE" : "FAILED GATE"]
-              )
-            ]),
-            createEl("td", { className: "font-mono" }, [String(item.created_at || new Date().toISOString())])
-          ]);
-        });
-        tbody.replaceChildren.apply(tbody, rows);
-      }
-
-      function renderCorpusInspector() {
-        var grid = document.getElementById("corpus-inspector-grid");
-        var nodes = appState.corpus.map(function (chunk) {
-          var tags = Array.isArray(chunk.tags) ? chunk.tags : [];
-          var tagNodes = tags.map(function (t) {
-            return createEl("span", { className: "tag-chip" }, [String(t)]);
+        function renderDocs() {
+          const blocks = state.chunks.map(function (c) {
+            return el("article", {
+              id: "doc-chunk-" + c.chunk_id,
+              className: "cx-doc-block",
+              "data-highlighted": state.highlightedChunkId === c.chunk_id ? "true" : "false",
+            }, [
+              el("h3", { className: "cx-doc-title", textContent: c.title }),
+              el("div", { className: "cx-doc-meta", textContent: c.doc_id + " · " + c.section }),
+              el("p", { className: "cx-doc-body", textContent: c.content }),
+            ]);
           });
-          var card = createEl("article", { className: "corpus-card" }, [
-            createEl("div", { style: "display: flex; justify-content: space-between; align-items: center;" }, [
-              createEl("span", { className: "badge badge-blue font-mono" }, [String(chunk.chunk_id)]),
-              createEl("span", { className: "font-mono", style: "font-size: 0.7rem; color: var(--text-muted);" }, [
-                String(chunk.doc_id)
-              ])
-            ]),
-            createEl("h3", { className: "citation-title" }, [String(chunk.title)]),
-            createEl("p", { className: "citation-excerpt" }, [String(chunk.content)]),
-            createEl("div", { className: "tag-row" }, tagNodes)
-          ]);
-
-          card.addEventListener("click", function () {
-            var qInput = document.getElementById("query-input");
-            qInput.value = "Explain " + chunk.title + " (" + chunk.chunk_id + ")";
-            updateCharCounter();
-            executeRagQuery();
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          });
-          return card;
-        });
-        grid.replaceChildren.apply(grid, nodes);
-      }
-
-      /* =====================================================================
-       * 6. API & LOCAL FALLBACK CONTROLLERS
-       * ===================================================================== */
-
-      function showValidationError(msg) {
-        var banner = document.getElementById("validation-banner");
-        var topkInput = document.getElementById("topk-input");
-        if (msg) {
-          banner.textContent = msg;
-          banner.classList.add("visible");
-          topkInput.classList.add("input-invalid");
-        } else {
-          banner.textContent = "";
-          banner.classList.remove("visible");
-          topkInput.classList.remove("input-invalid");
-        }
-      }
-
-      async function executeRagQuery() {
-        var qInput = document.getElementById("query-input");
-        var topkInput = document.getElementById("topk-input");
-        var queryStr = String(qInput.value || "").trim();
-
-        if (!queryStr) {
-          showValidationError("INVALID_QUERY: Query cannot be empty or whitespace.");
-          return;
+          els.docsScroll.replaceChildren.apply(els.docsScroll, blocks);
         }
 
-        var topkCheck = validateTopKInput(topkInput.value);
-        if (!topkCheck.valid) {
-          showValidationError(topkCheck.error);
-          return;
-        }
-        showValidationError("");
+        async function askQuestion(queryText) {
+          const clean = queryText.trim();
+          if (!clean) return;
+          els.sendBtn.disabled = true;
+          els.askInput.value = "";
 
-        var btn = document.getElementById("execute-query-btn");
-        btn.disabled = true;
-
-        try {
-          if (window.location.protocol !== "file:") {
-            var res = await fetch("/api/v1/rag/query", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query: queryStr, top_k: topkCheck.value })
-            });
-            if (res.ok) {
-              var data = await res.json();
-              appState.mode = "API";
-              updateHeaderStatus();
-              renderRagResponse(normalizeRagResponse(data));
-              btn.disabled = false;
-              return;
-            }
-          }
-        } catch (_err) {
-          // Graceful fallback to deterministic local engine
-        }
-
-        appState.mode = "STANDALONE";
-        updateHeaderStatus();
-        var localResp = runLocalHybridPipeline(queryStr, topkCheck.value, appState.corpus);
-        renderRagResponse(localResp);
-        btn.disabled = false;
-      }
-
-      function runLocalEvalSuite(topK) {
-        var results = GOLDEN_EVAL_CASES.map(function (evalCase) {
-          var resp = runLocalHybridPipeline(evalCase.query, topK, appState.corpus);
-          var retrievedSet = {};
-          resp.candidates.forEach(function (c) { retrievedSet[c.chunk.chunk_id] = true; });
-          var citedSet = {};
-          resp.citations.forEach(function (c) { citedSet[c.chunk_id] = true; });
-
-          var expHits = evalCase.expected_chunk_ids.filter(function (id) { return Boolean(retrievedSet[id]); }).length;
-          var recall = evalCase.expected_chunk_ids.length > 0 ? expHits / evalCase.expected_chunk_ids.length : 1.0;
-
-          var citHits = evalCase.expected_chunk_ids.filter(function (id) { return Boolean(citedSet[id]); }).length;
-          var precision = resp.citations.length > 0 ? citHits / resp.citations.length : 0.0;
-
-          return {
-            case_id: evalCase.case_id,
-            query: evalCase.query,
-            intent: resp.intent,
-            faithfulness: resp.faithfulness_score,
-            citation_precision: precision,
-            context_recall: recall,
-            keyword_hit_rate: 1.0,
-            latency_ms: resp.total_latency_ms,
-            passed: resp.faithfulness_score >= 0.7 && precision >= 0.7 && recall >= 0.75
-          };
-        });
-
-        var total = results.length;
-        var passedCases = results.filter(function (r) { return r.passed; }).length;
-        var avgFaith = results.reduce(function (s, r) { return s + r.faithfulness; }, 0) / total;
-        var avgPrec = results.reduce(function (s, r) { return s + r.citation_precision; }, 0) / total;
-        var avgRec = results.reduce(function (s, r) { return s + r.context_recall; }, 0) / total;
-        var avgLat = results.reduce(function (s, r) { return s + r.latency_ms; }, 0) / total;
-
-        var report = {
-          run_id: "eval-" + Math.random().toString(16).slice(2, 10),
-          total_cases: total,
-          passed_cases: passedCases,
-          avg_faithfulness: Number(avgFaith.toFixed(6)),
-          avg_citation_precision: Number(avgPrec.toFixed(6)),
-          avg_context_recall: Number(avgRec.toFixed(6)),
-          avg_latency_ms: Number(avgLat.toFixed(4)),
-          passed_gate: avgFaith >= 0.7 && avgPrec >= 0.7 && avgRec >= 0.75,
-          results: results,
-          created_at: new Date().toISOString()
-        };
-
-        appState.evalLedger.unshift(report);
-        return report;
-      }
-
-      async function executeEvalSuite() {
-        var topkInput = document.getElementById("topk-input");
-        var topkCheck = validateTopKInput(topkInput.value);
-        var kVal = topkCheck.valid ? topkCheck.value : 5;
-
-        var btn = document.getElementById("run-eval-btn");
-        btn.disabled = true;
-
-        try {
-          if (window.location.protocol !== "file:") {
-            var res = await fetch("/api/v1/evals/run", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ top_k: kVal })
-            });
-            if (res.ok) {
-              var reportData = await res.json();
-              appState.mode = "API";
-              updateHeaderStatus();
-              renderEvalReport(reportData);
-              await refreshLedgerFromApi();
-              btn.disabled = false;
-              return;
-            }
-          }
-        } catch (_err) {
-          // Fallback to local evaluation harness
-        }
-
-        appState.mode = "STANDALONE";
-        updateHeaderStatus();
-        var localReport = runLocalEvalSuite(kVal);
-        renderEvalReport(localReport);
-        renderEvalLedger(appState.evalLedger);
-        btn.disabled = false;
-      }
-
-      async function refreshLedgerFromApi() {
-        try {
-          var res = await fetch("/api/v1/evals/ledger");
-          if (res.ok) {
-            var payload = await res.json();
-            var list = Array.isArray(payload)
-              ? payload
-              : (payload.ledger || payload.reports || payload.entries || payload.data || []);
-            if (Array.isArray(list)) {
-              appState.evalLedger = list;
-              renderEvalLedger(appState.evalLedger);
-            }
-          }
-        } catch (_err) {
-          renderEvalLedger(appState.evalLedger);
-        }
-      }
-
-      async function bootstrapApp() {
-        if (window.location.protocol !== "file:") {
           try {
-            var chunksRes = await fetch("/api/v1/chunks");
-            if (chunksRes.ok) {
-              var cPayload = await chunksRes.json();
-              var cList = Array.isArray(cPayload) ? cPayload : (cPayload.chunks || cPayload.data || []);
-              if (Array.isArray(cList) && cList.length > 0) {
-                appState.corpus = cList;
-                appState.mode = "API";
-              }
-            }
-          } catch (_err) {
-            appState.mode = "STANDALONE";
-          }
-        }
-
-        updateHeaderStatus();
-        renderCorpusInspector();
-        await executeRagQuery();
-        await executeEvalSuite();
-      }
-
-      function updateCharCounter() {
-        var qInput = document.getElementById("query-input");
-        var counter = document.getElementById("query-char-counter");
-        counter.textContent = String((qInput.value || "").length) + " / 2000 chars";
-      }
-
-      /* =====================================================================
-       * 7. EVENT LISTENERS & INTERSECTION OBSERVER
-       * ===================================================================== */
-
-      document.getElementById("rag-query-form").addEventListener("submit", function (e) {
-        e.preventDefault();
-        executeRagQuery();
-      });
-
-      document.getElementById("query-input").addEventListener("input", updateCharCounter);
-
-      document.getElementById("topk-input").addEventListener("input", function (e) {
-        var check = validateTopKInput(e.target.value);
-        showValidationError(check.valid ? "" : check.error);
-      });
-
-      document.addEventListener("keydown", function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-          e.preventDefault();
-          executeRagQuery();
-        }
-      });
-
-      var presetButtons = document.querySelectorAll(".preset-btn");
-      for (var i = 0; i < presetButtons.length; i++) {
-        presetButtons[i].addEventListener("click", function (e) {
-          for (var j = 0; j < presetButtons.length; j++) {
-            presetButtons[j].classList.remove("active");
-          }
-          var btn = e.currentTarget;
-          btn.classList.add("active");
-          var q = btn.getAttribute("data-preset-query") || "";
-          document.getElementById("query-input").value = q;
-          updateCharCounter();
-          executeRagQuery();
-        });
-      }
-
-      document.getElementById("run-eval-btn").addEventListener("click", function () {
-        executeEvalSuite();
-      });
-
-      // Subtle scroll-entry reveal via IntersectionObserver per minimalist-skill
-      if ("IntersectionObserver" in window) {
-        var observer = new IntersectionObserver(
-          function (entries) {
-            entries.forEach(function (entry) {
-              if (entry.isIntersecting) {
-                entry.target.classList.add("is-visible");
-                observer.unobserve(entry.target);
-              }
+            const resp = await fetch("/api/v1/rag/query", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: clean, top_k: 4 }),
             });
-          },
-          { threshold: 0.05 }
-        );
-        var blocks = document.querySelectorAll(".reveal-block");
-        for (var b = 0; b < blocks.length; b++) {
-          observer.observe(blocks[b]);
-        }
-      } else {
-        var fallbackBlocks = document.querySelectorAll(".reveal-block");
-        for (var fb = 0; fb < fallbackBlocks.length; fb++) {
-          fallbackBlocks[fb].classList.add("is-visible");
-        }
-      }
+            const res = await resp.json();
+            if (!resp.ok) {
+              els.turns.appendChild(
+                el("div", { className: "cx-ai-a", textContent: res.message || "No se encontró respaldo documental para esa consulta." }),
+              );
+              return;
+            }
+            state.lastQueryResult = res;
+            const citations = res.citations || [];
+            const citeButtons = citations.map(function (c, idx) {
+              return el("button", {
+                type: "button",
+                className: "cx-cite-btn",
+                textContent: "[" + (idx + 1) + "] " + c.title,
+                onClick: function () { focusChunk(c.chunk_id); },
+              });
+            });
 
-      bootstrapApp();
-    })();
-  </script>
-</body>
+            if (citations[0]) {
+              focusChunk(citations[0].chunk_id);
+            }
+
+            const cleanedAnswer = String(res.answer || "").replace(/\s*\[cite:[^\]]+\]/g, "");
+            els.turns.appendChild(
+              el("div", { className: "cx-turn" }, [
+                el("div", { className: "cx-user-q", textContent: clean }),
+                el("div", { className: "cx-ai-a" }, [
+                  el("p", { className: "cx-ai-serif", textContent: cleanedAnswer }),
+                  el("div", { className: "cx-cite-row" }, citeButtons),
+                ]),
+              ]),
+            );
+            els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
+            renderArchitectureDrawer();
+          } finally {
+            els.sendBtn.disabled = false;
+          }
+        }
+
+        function openIngestDrawer() {
+          const titleIn = el("input", { className: "cx-ask-input", placeholder: "Ej. Política de Devoluciones 2026" });
+          const sectionIn = el("input", { className: "cx-ask-input", value: "operaciones" });
+          const contentIn = el("textarea", {
+            className: "cx-ask-input",
+            style: "min-height:130px;",
+            placeholder: "Pega aquí un párrafo o guía para consultarla en el chat...",
+          });
+          const saveBtn = el("button", {
+            type: "button",
+            className: "cx-btn-primary",
+            textContent: "Indexar documento",
+            onClick: async function () {
+              const resp = await fetch("/api/v1/documents/ingest", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  doc_id: "DOC-USER-" + Math.random().toString(36).slice(2, 6).toUpperCase(),
+                  title: titleIn.value.trim() || "Documento de usuario",
+                  section: sectionIn.value.trim() || "general",
+                  content: contentIn.value.trim(),
+                  tags: ["usuario"],
+                }),
+              });
+              if (resp.ok) {
+                els.ingestBackdrop.setAttribute("data-open", "false");
+                await loadChunks();
+              }
+            },
+          });
+
+          els.ingestBody.replaceChildren(
+            el("label", { style: "font-size:13px;font-weight:700;", textContent: "Título" }),
+            titleIn,
+            el("label", { style: "font-size:13px;font-weight:700;", textContent: "Sección" }),
+            sectionIn,
+            el("label", { style: "font-size:13px;font-weight:700;", textContent: "Contenido" }),
+            contentIn,
+            saveBtn,
+          );
+          els.ingestBackdrop.setAttribute("data-open", "true");
+        }
+
+        async function runEvalSuite() {
+          const resp = await fetch("/api/v1/evals/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          state.evalRun = await resp.json();
+          renderArchitectureDrawer();
+        }
+
+        function renderArchitectureDrawer() {
+          const nodes = [
+            el("div", { className: "cx-tech-card" }, [
+              el("strong", { style: "display:block;margin-bottom:4px;", textContent: "Pipeline Multi-Agente + RAG Híbrido (Okapi BM25 + Vectores 64-D RRF)" }),
+              el("span", { style: "color:var(--muted-ink);", textContent: "Router clasifica intención léxica vs semántica; RRF k=60 fusiona candidatos y Citation Guardrail bloquea respuestas sin evidencia." }),
+            ]),
+          ];
+
+          if (state.lastQueryResult) {
+            nodes.push(
+              el("div", { className: "cx-tech-card" }, [
+                el("strong", { style: "display:block;margin-bottom:4px;", textContent: "Última consulta auditada" }),
+                el("div", { className: "cx-mono", textContent: "Intención: " + state.lastQueryResult.intent + " · Faithfulness: " + state.lastQueryResult.faithfulness_score + " · Latencia: " + Number(state.lastQueryResult.total_latency_ms).toFixed(2) + " ms" }),
+              ]),
+            );
+          }
+
+          if (state.evalRun) {
+            nodes.push(
+              el("div", { className: "cx-tech-card", style: "background:var(--cite-bg);border-color:var(--cite-amber);" }, [
+                el("strong", { style: "display:block;margin-bottom:4px;", textContent: "Eval Harness (" + state.evalRun.run_id + ")" }),
+                el("span", { className: "cx-mono", textContent: state.evalRun.passed_cases + "/" + state.evalRun.total_cases + " casos PASS · Faithfulness " + state.evalRun.avg_faithfulness + " · Gate: " + (state.evalRun.passed_gate ? "APROBADO" : "REVISAR") }),
+              ]),
+            );
+          }
+
+          nodes.push(
+            el("button", {
+              type: "button",
+              className: "cx-btn-primary",
+              textContent: "Ejecutar suite de evaluación (Eval Harness)",
+              onClick: runEvalSuite,
+            }),
+          );
+
+          els.archBody.replaceChildren.apply(els.archBody, nodes);
+        }
+
+        document.querySelectorAll(".cx-starter-chip").forEach(function (btn) {
+          btn.addEventListener("click", function () { askQuestion(btn.getAttribute("data-q") || ""); });
+        });
+        els.askForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          askQuestion(els.askInput.value);
+        });
+        document.getElementById("cx-ingest-btn").addEventListener("click", openIngestDrawer);
+        document.getElementById("cx-ingest-close").addEventListener("click", function () { els.ingestBackdrop.setAttribute("data-open", "false"); });
+        document.getElementById("cx-arch-btn").addEventListener("click", function () { renderArchitectureDrawer(); els.archBackdrop.setAttribute("data-open", "true"); });
+        document.getElementById("cx-arch-close").addEventListener("click", function () { els.archBackdrop.setAttribute("data-open", "false"); });
+        window.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") {
+            els.ingestBackdrop.setAttribute("data-open", "false");
+            els.archBackdrop.setAttribute("data-open", "false");
+          }
+        });
+
+        loadChunks().then(function () {
+          askQuestion("Como funciona la busqueda hibrida BM25 y pgvector RRF?");
+        });
+      })();
+    </script>
+  </body>
 </html>
